@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Chat AI Suara</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        .section { margin-bottom: 1.5em; }
+        #status { color: #007bff; margin-bottom: 1em; }
+        #audio-player { margin-top: 1em; }
+        textarea { width: 100%; min-height: 60px; }
+        button { padding: 0.5em 1em; }
+    </style>
+</head>
+<body>
+    <h2>Test Chat AI Suara (STT → Ollama → TTS)</h2>
+    <div class="section">
+        <button id="record-btn">🎤 Rekam Pertanyaan</button>
+        <span id="recording-status"></span>
+        <audio id="audio-player" controls style="display:none"></audio>
+    </div>
+    <div class="section">
+        <label>Hasil STT (teks pertanyaan):</label>
+        <textarea id="stt-text" readonly></textarea>
+    </div>
+    <div class="section">
+        <label>Jawaban AI (Ollama):</label>
+        <textarea id="ai-text" readonly></textarea>
+    </div>
+    <div class="section">
+        <label>Hasil TTS (jawaban suara):</label>
+        <audio id="tts-player" controls style="display:none"></audio>
+    </div>
+    <div id="status"></div>
+    <script>
+    let mediaRecorder, audioChunks = [];
+    const recordBtn = document.getElementById('record-btn');
+    const audioPlayer = document.getElementById('audio-player');
+    const ttsPlayer = document.getElementById('tts-player');
+    const sttText = document.getElementById('stt-text');
+    const aiText = document.getElementById('ai-text');
+    const statusDiv = document.getElementById('status');
+    const recordingStatus = document.getElementById('recording-status');
+
+    function setStatus(msg) {
+        statusDiv.textContent = msg;
+    }
+
+    recordBtn.onclick = async function() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            recordBtn.textContent = '🎤 Rekam Pertanyaan';
+            recordingStatus.textContent = '';
+            return;
+        }
+        audioChunks = [];
+        sttText.value = '';
+        aiText.value = '';
+        ttsPlayer.style.display = 'none';
+        setStatus('Merekam audio...');
+        recordBtn.textContent = '⏹️ Stop';
+        recordingStatus.textContent = ' (Sedang merekam...)';
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = async () => {
+                setStatus('Mengirim audio ke STT...');
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                audioPlayer.src = URL.createObjectURL(audioBlob);
+                audioPlayer.style.display = 'block';
+                // Kirim ke STT
+                const formData = new FormData();
+                formData.append('file', audioBlob, 'input.webm');
+                let sttResult = '';
+                try {
+                    const resp = await fetch('/stt_streaming/', { method: 'POST', body: formData });
+                    sttResult = await resp.text();
+                    sttText.value = sttResult.trim();
+                    setStatus('Mengirim pertanyaan ke AI...');
+                } catch (e) {
+                    setStatus('Gagal STT: ' + e);
+                    return;
+                }
+                // Kirim ke Ollama
+                let aiResult = '';
+                try {
+                    const aiForm = new FormData();
+                    aiForm.append('prompt', sttResult.trim());
+                    aiForm.append('model', 'llama3');
+                    const resp = await fetch('/ollama_chat/', { method: 'POST', body: aiForm });
+                    let aiTextResult = '';
+                    const reader = resp.body.getReader();
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        aiTextResult += new TextDecoder().decode(value);
+                        aiText.value = aiTextResult;
+                    }
+                    setStatus('Mengubah jawaban AI ke suara...');
+                } catch (e) {
+                    setStatus('Gagal AI: ' + e);
+                    return;
+                }
+                // Kirim ke TTS
+                try {
+                    const ttsUrl = `/synthesize_speech/?text=${encodeURIComponent(aiText.value)}&voice=default_en`;
+                    const ttsResp = await fetch(ttsUrl);
+                    if (!ttsResp.ok) throw new Error('TTS error');
+                    const ttsBlob = await ttsResp.blob();
+                    ttsPlayer.src = URL.createObjectURL(ttsBlob);
+                    ttsPlayer.style.display = 'block';
+                    setStatus('Selesai!');
+                } catch (e) {
+                    setStatus('Gagal TTS: ' + e);
+                }
+            };
+            mediaRecorder.start();
+        } catch (e) {
+            setStatus('Tidak bisa mengakses mic: ' + e);
+        }
+    };
+    </script>
+</body>
+</html>
