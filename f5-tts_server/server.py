@@ -47,7 +47,7 @@ model = F5TTS(
     ode_method="euler",  # Use euler solver for stability
     use_ema=True,
     vocoder_name="vocos",
-    ckpt_file=str(cached_path("hf://SWivid/F5-TTS/F5TTS_Base/model_1200000.safetensors"))  # Use the base model
+    ckpt_file=str(cached_path("hf://PapaRazi/Ijazah_Palsu_V2/model_1200000.safetensors"))  # Use the Indonesia TTS model
 )
 
 output_dir = 'outputs'
