@@ -15,6 +15,8 @@ The cheapest GPU is enough to run the server.
 - Voice cloning capabilities
 - Adjustable speech speed
 - Audio file upload and processing
+- **NEW: Speech-to-Text (STT) Bahasa Indonesia (Whisper) streaming endpoint**
+- **NEW: AI Chat endpoint (Ollama local integration, e.g. Llama3, streaming response)**
 
 ## Installation
 
@@ -90,6 +92,78 @@ Synthesize speech using a specific voice and style.
 - `voice` (str): Voice to use
 - `speed` (float, optional): Speech speed. Default: 1.0
 
+### 5. Streaming Speech-to-Text (Bahasa Indonesia)
+
+Performs streaming speech-to-text transcription using Whisper Bahasa Indonesia.
+
+**Endpoint:** `/stt_streaming/`
+
+**Method:** `POST`
+
+**Parameters:**
+- `file` (file): Audio file to transcribe (webm, wav, mp3, etc.)
+
+**Response:**
+- Streaming plain text (one sentence per line)
+
+**Catatan:**
+- Model yang digunakan: `cahya/whisper-medium-id` (Bahasa Indonesia)
+- Hasil dikirim secara streaming per kalimat.
+
+---
+Performs streaming speech-to-text transcription using Whisper Bahasa Indonesia.
+
+**Endpoint:** `/stt_streaming/`
+
+**Method:** `POST`
+
+**Parameters:**
+- `file` (file): Audio file to transcribe (webm, wav, mp3, etc.)
+
+**Response:**
+- Streaming plain text (one sentence per line)
+
+**Note:**
+- Model used: `cahya/whisper-medium-id` (Bahasa Indonesia)
+- Result is streamed per sentence.
+
+### 6. AI Chat (Ollama Local)
+
+Generate AI chat responses using a local Ollama model (e.g. Llama3), with streaming output.
+
+**Endpoint:** `/ollama_chat/`
+
+**Method:** `POST`
+
+**Parameters:**
+- `prompt` (str): The question or prompt to send to the AI
+- `model` (str, optional): Model name (default: `llama3`)
+
+**Response:**
+- Streaming plain text (AI response, streamed as generated)
+
+**Catatan:**
+- Endpoint ini mengirim permintaan ke Ollama REST API lokal (`http://localhost:11434/api/generate`)
+- Mendukung streaming response (cocok untuk aplikasi chat interaktif)
+
+---
+Generate AI chat responses using a local Ollama model (e.g. Llama3), with streaming output.
+
+**Endpoint:** `/ollama_chat/`
+
+**Method:** `POST`
+
+**Parameters:**
+- `prompt` (str): The question or prompt to send to the AI
+- `model` (str, optional): Model name (default: `llama3`)
+
+**Response:**
+- Streaming plain text (AI response, streamed as generated)
+
+**Note:**
+- This endpoint sends requests to the local Ollama REST API (`http://localhost:11434/api/generate`)
+- Supports streaming response (suitable for interactive chat apps)
+
 ## Response Headers
 
 All synthesis endpoints include these response headers:
@@ -135,4 +209,20 @@ params = {
 response = requests.get(url, params=params)
 with open("cloned_voice.wav", "wb") as f:
     f.write(response.content)
+
+# Example: Streaming Speech-to-Text (STT Bahasa Indonesia)
+import requests
+
+url = "http://localhost:7860/stt_streaming/"
+files = {'file': open('input.webm', 'rb')}
+response = requests.post(url, files=files, stream=True)
+for line in response.iter_lines():
+    print(line.decode())  # Each line is a sentence
+
+# Example: AI Chat (Ollama)
+url = "http://localhost:7860/ollama_chat/"
+data = {'prompt': 'Apa itu F5-TTS?', 'model': 'llama3'}
+response = requests.post(url, data=data, stream=True)
+for chunk in response.iter_content(chunk_size=None):
+    print(chunk.decode(), end="")
 ```
